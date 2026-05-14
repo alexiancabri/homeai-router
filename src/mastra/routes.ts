@@ -99,20 +99,17 @@ export const chatStreamRoute = registerApiRoute('/homeai/chat/stream', {
 
     const userContent = buildUserContent(message, file);
 
-    // Only pass the current user message — Mastra memory (resource + thread)
-    // loads the full conversation history from storage and prepends it.
-    // Passing priorMessages here too caused every previous Q&A to appear twice,
-    // making the model regenerate old answers before answering the new question.
+    // Use frontend-provided history as the sole source of conversation context.
+    // Mastra thread memory (workingMemory + lastMessages) was injecting the full
+    // prior conversation on top of priorMessages, causing every previous answer
+    // to appear twice — the model then regenerated old answers before answering
+    // the new question. Dropping the memory option gives us clean, controlled context.
     const messages: any[] = [
+      ...priorMessages,
       { role: 'user', content: userContent },
     ];
 
-    const stream = await agent.stream(messages, {
-      memory: {
-        resource: resourceId,
-        thread: threadId,
-      },
-    });
+    const stream = await agent.stream(messages);
 
     return new Response(
       new ReadableStream({
